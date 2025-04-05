@@ -3,3 +3,6 @@ uvicorn
 elasticsearch
 python-multipart
 openai
+python-dotenv
+openai
+
