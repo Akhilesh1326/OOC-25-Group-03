@@ -8,7 +8,7 @@ export default function AboutPage() {
     <div className="container mx-auto py-10">
       <div className="flex items-center mb-8">
         <Button variant="outline" size="sm" asChild className="mr-4">
-          <Link href="/">
+          <Link to="/">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
           </Link>
@@ -158,7 +158,7 @@ export default function AboutPage() {
 
           <div className="mt-8 flex justify-center">
             <Button size="lg" asChild>
-              <Link href="/">Try It Now</Link>
+              <Link to="/">Try It Now</Link>
             </Button>
           </div>
         </CardContent>
