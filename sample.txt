@@ -1,0 +1,3 @@
+This RFP requires ISO 9001 certification for quality assurance.
+The vendor should also have ISO 27001 certification for data security.
+Experience with government contracts is preferred.

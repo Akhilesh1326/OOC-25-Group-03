@@ -1,0 +1,8 @@
+{
+    "company_name": "ConsultAdd",
+    "certifications": {
+        "ISO": false,
+        "NIST": true
+    },
+    "past_performance": ["project1", "project2"]
+}
