@@ -11,9 +11,11 @@ async def analyze(file: UploadFile = File(...)):
     compliance = check_compliance(result)
     return {"analysis": result, "compliance": compliance}
 
-
-app = FastAPI()
-
 @app.get("/")
 def read_root():
     return {"message": "Hello Akhilesh!"}
+
+
+# @app.post("/upload-document")
+# def read_root():
+#     return {"status": "online"}
