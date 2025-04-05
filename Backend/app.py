@@ -1,11 +1,12 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from s3_utils import get_file_hash, file_exists_in_s3, upload_to_s3, delete_from_s3
+from rag.chunker import chunk_pdf
 import os
-from backend.analyze import analyze_rfp
-from backend.agents.compliance import check_compliance
 
 app = FastAPI()
 
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,23 +18,45 @@ app.add_middleware(
 UPLOAD_DIR = "data/rfps"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.get("/")
+def root():
+    return {"message": "RFP Upload API is running!"}
+
 @app.post("/analyze/")
-async def analyze(file: UploadFile = File(...)):
-    file_location = os.path.join(UPLOAD_DIR, file.filename)
-    
-    with open(file_location, "wb") as f:
-        f.write(await file.read())
+async def upload_rfp(file: UploadFile = File(...)):
+    content = await file.read()
+    file_hash = get_file_hash(content)
 
-    file_path = os.path.abspath(file_location)
+    if file_exists_in_s3(file_hash, file.filename):
+        raise HTTPException(status_code=400, detail="File already exists in S3")
 
-    # analyze_rfp returns a list of chunks or results
-    analysis_result = await analyze_rfp(file_path)
+    # Save locally for chunking
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(content)
 
-    # Assume we're only checking compliance on the first chunk for now
-    first_chunk = analysis_result[0]
-    compliance_result = await check_compliance(first_chunk["full_text"])
+    # Upload to S3
+    upload_to_s3(content, file.filename, file_hash)
+
+    # Chunking logic
+    chunks = chunk_pdf(file_path)
 
     return {
-        "analysis": analysis_result,
-        "compliance": compliance_result
+        "message": "File uploaded and chunked successfully.",
+        "total_chunks": len(chunks),
+        "chunks": chunks[:3]  # Return sample
     }
+
+@app.delete("/delete/")
+async def delete_rfp(file: UploadFile = File(...)):
+    content = await file.read()
+    file_hash = get_file_hash(content)
+
+    if not file_exists_in_s3(file_hash, file.filename):
+        raise HTTPException(status_code=404, detail="File not found in S3")
+
+    success = delete_from_s3(file_hash, file.filename)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete file from S3")
+
+    return {"message": "File deleted successfully"}
