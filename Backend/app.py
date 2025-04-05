@@ -7,6 +7,7 @@ app = FastAPI()
 @app.post("/analyze/")
 async def analyze(file: UploadFile = File(...)):
     content = await file.read()
+    print(content)
     result = analyze_rfp(content)
     compliance = check_compliance(result)
     return {"analysis": result, "compliance": compliance}
