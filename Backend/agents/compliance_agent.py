@@ -1,25 +1,47 @@
+import sys
 import os
-import json
 
-# Get the absolute path to the current file (compliance_agent.py)
-current_dir = os.path.dirname(os.path.abspath(__file__))
+# Ensure the parent directory (Backend/) is in the path for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Move up to the Backend directory
-backend_dir = os.path.dirname(current_dir)
+from llm_client import async_llm_call
 
-# Move up to the project root (OOC25)
-project_root = os.path.dirname(backend_dir)
+# Async function to check compliance in RFP content
+async def check_compliance(rfp_text: str) -> dict:
+    prompt = f"""
+    You are a government contract compliance analyst. Analyze the following RFP content and identify any compliance risks. 
+    Focus on legal requirements, mandatory certifications, submission deadlines, and eligibility clauses.
 
-# Construct the path to data/compliance_data.json
-json_path = os.path.join(project_root, "data", "compliance_data.json")
+    RFP Content:
+    {rfp_text}
 
-# Load the JSON
-with open(json_path, "r") as f:
-    profile = json.load(f)
-
-def check_compliance(analysis):
-    compliance_report = []
-    for chunk in analysis["chunks"]:
-        if "ISO" in chunk and not profile.get("certifications", {}).get("ISO"):
-            compliance_report.append("Missing ISO Certification")
-    return compliance_report
+    Provide your analysis in the following format:
+    {{
+        "compliance_passed": true/false,
+        "issues": [
+            "Issue 1",
+            "Issue 2",
+            ...
+        ],
+        "summary": "Brief summary of compliance check"
+    }}
+    """
+    
+    response = await async_llm_call(prompt)
+    
+    try:
+        result = eval(response) if isinstance(response, str) else response
+        if isinstance(result, dict):
+            return result
+        else:
+            return {
+                "compliance_passed": False,
+                "issues": ["LLM returned non-dict response"],
+                "summary": "Failed to parse compliance result"
+            }
+    except Exception as e:
+        return {
+            "compliance_passed": False,
+            "issues": [str(e)],
+            "summary": "Error during compliance analysis"
+        }
