@@ -5,11 +5,11 @@ import { SubmissionChecklist } from "../components/SubmissionChecklist"
 import { RiskAnalyzer } from "../components/RiskAnalysis"
 import { DocumentInfo } from "../components/DocumentInfo"
 
-export default function AnalysisPage({ params }) {
+export default function AnalysisPage() {
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold mb-2">RFP Analysis Results</h1>
-      <p className="text-muted-foreground mb-8">Document ID: {params.id}</p>
+      {/* <p className="text-muted-foreground mb-8">Document ID: {params.id}</p> */}
 
       <DocumentInfo />
 
