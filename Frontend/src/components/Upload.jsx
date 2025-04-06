@@ -8,11 +8,13 @@ import { Card, CardContent } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { Progress } from "./ui/Progress";
 import { useToast } from "../hooks/UseToast";
+import axios from 'axios'
 
 export function RFPUploader() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const { toast } = useToast();
   const router = useNavigate();
 
@@ -25,6 +27,7 @@ export function RFPUploader() {
         selectedFile.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       ) {
         setFile(selectedFile);
+        setUploadSuccess(false);
       } else {
         toast({
           title: "Invalid file type",
@@ -39,6 +42,7 @@ export function RFPUploader() {
     if (!file) return;
 
     setUploading(true);
+    setUploadSuccess(false);
 
     const interval = setInterval(() => {
       setProgress((prev) => {
@@ -51,27 +55,40 @@ export function RFPUploader() {
     }, 100);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Step 1: Clear Elasticsearch index
+      await axios.delete("/api/clear-index");
+
+      // Step 2: Upload file
+      const formData = new FormData();
+      formData.append("file", file);
+
+      await axios.post("/api/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       setProgress(100);
+      setUploadSuccess(true);
+
       toast({
         title: "Upload successful",
         description: "Your RFP document has been processed successfully",
       });
-
-      setTimeout(() => {
-        router("/analysis/1");
-      }, 1000);
     } catch (error) {
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your document",
+        description: error?.response?.data?.detail || error.message || "An error occurred",
         variant: "destructive",
       });
     } finally {
       clearInterval(interval);
       setUploading(false);
     }
+  };
+
+  const goToAnalysis = () => {
+    router("/analysis"); // no ID needed, because you only work with one doc in ES
   };
 
   return (
@@ -104,11 +121,16 @@ export function RFPUploader() {
                 <p className="text-sm text-muted-foreground">
                   {(file.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
+
                 {uploading ? (
                   <div className="w-full max-w-md">
                     <Progress value={progress} className="h-2" />
                     <p className="text-xs text-center mt-2">{progress}% complete</p>
                   </div>
+                ) : uploadSuccess ? (
+                  <Button onClick={goToAnalysis} className="mt-2">
+                    Go to Analysis
+                  </Button>
                 ) : (
                   <Button onClick={handleUpload} className="mt-2">
                     Analyze Document
