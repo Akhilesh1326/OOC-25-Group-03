@@ -1,18 +1,25 @@
+import { useEffect, useState } from "react"
+import axios from "axios"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/Card"
 import { Badge } from "./ui/Badge"
 import { FileText, Calendar, Building } from "lucide-react"
 
 export function DocumentInfo() {
-  // In a real app, this would come from your backend/database
-  const rfpInfo = {
-    title: "IT Systems Modernization Project",
-    agency: "Department of Health and Human Services",
-    issueDate: "April 2, 2023",
-    dueDate: "May 15, 2023",
-    contractValue: "$2.5M - $4M",
-    duration: "24 months",
-    status: "Eligible",
-  }
+  const [rfpInfo, setRfpInfo] = useState(null)
+
+  useEffect(() => {
+      const fetchInfo = async()=>{
+        try {
+          const res = await axios.get("/api/rfp-info");
+          setRfpInfo(res.data);
+        } catch (error) {
+          console.error("Failed to fetch RFP info:", error)
+        }
+      }
+      fetchInfo();
+  }, [])
+
+  if (!rfpInfo) return <div>Loading...</div>
 
   return (
     <Card>
@@ -56,4 +63,3 @@ export function DocumentInfo() {
     </Card>
   )
 }
-
