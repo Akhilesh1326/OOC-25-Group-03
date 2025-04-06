@@ -1,5 +1,5 @@
 from fastapi import UploadFile, File, FastAPI
-from elastic.elastic_helper import generate_rag_response, index_document, query_eligibility_criteria, query_project_requirements, analyze_contract_risks, generate_submission_checklist
+from elastic.elastic_helper import generate_rag_response, index_document, query_eligibility_criteria, query_project_requirements, analyze_contract_risks, generate_submission_checklist, query_rfp_metadata
 from pathlib import Path
 import os
 from elasticsearch import Elasticsearch
@@ -86,7 +86,7 @@ def get_requirements():
 @app.get("/api/contract-risks")
 def get_contract_risks():
     response = analyze_contract_risks()
-    # print(response)
+    print(response)
     return {"risks": response}
 
 @app.get("/api/submission-checklist")
@@ -95,3 +95,8 @@ def get_submission_checklist():
     print(checklist)
     print() 
     return JSONResponse(content={"checklist": checklist})
+
+
+@app.get("/api/rfp-info")
+def read_rfp_info():
+    return query_rfp_metadata()
