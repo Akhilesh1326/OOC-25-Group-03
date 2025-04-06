@@ -1,39 +1,97 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import UploadFile, File, FastAPI
+from elastic.elastic_helper import generate_rag_response, index_document, query_eligibility_criteria, query_project_requirements, analyze_contract_risks, generate_submission_checklist
+from pathlib import Path
 import os
-from backend.analyze import analyze_rfp
-from backend.agents.compliance import check_compliance
+from elasticsearch import Elasticsearch
+from PyPDF2 import PdfReader
+from fastapi.responses import JSONResponse
+
+es = Elasticsearch(
+    "http://localhost:9200",
+    basic_auth=("elastic", os.getenv("ELASTIC_PASSWORD"))
+)
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+UPLOAD_DIR = "uploads"
+TEXT_DIR = "texts"
 
-UPLOAD_DIR = "data/rfps"
+# Ensure directories exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(TEXT_DIR, exist_ok=True)
 
-@app.post("/analyze/")
-async def analyze(file: UploadFile = File(...)):
-    file_location = os.path.join(UPLOAD_DIR, file.filename)
-    
+@app.post("/api/upload")
+async def upload_pdf(file: UploadFile = File(...)):
+    print("uploading new version of file")
+    filename = file.filename
+    file_location = os.path.join(UPLOAD_DIR, filename)
+
+    # Save uploaded file
     with open(file_location, "wb") as f:
-        f.write(await file.read())
+        content = await file.read()
+        f.write(content)
 
-    file_path = os.path.abspath(file_location)
+    # Extract text from PDF
+    reader = PdfReader(file_location)
+    full_text = "\n".join([page.extract_text() or "" for page in reader.pages])
 
-    # analyze_rfp returns a list of chunks or results
-    analysis_result = await analyze_rfp(file_path)
+    # Save text
+    text_path = os.path.join(TEXT_DIR, filename.replace(".pdf", ".txt"))
+    with open(text_path, "w", encoding="utf-8") as f:
+        f.write(full_text)
 
-    # Assume we're only checking compliance on the first chunk for now
-    first_chunk = analysis_result[0]
-    compliance_result = await check_compliance(first_chunk["full_text"])
+    # Index into Elasticsearch
+    index_document(index_name="rfp_documentsv2", text=full_text, filename=filename)
 
-    return {
-        "analysis": analysis_result,
-        "compliance": compliance_result
-    }
+    return {"message": f"✅ Uploaded and indexed: {filename}"}
+
+
+
+
+@app.get("/rag")
+def rag_query(q: str):
+    answer = generate_rag_response(q)
+    return {"answer": answer}
+
+@app.delete("/api/clear-index")
+def clear_index():
+    print("delete older version here")
+    es.indices.delete(index="rfp_documentsv2", ignore_unavailable=True)
+    es.indices.create(index="rfp_documentsv2", body={
+        "mappings": {
+            "properties": {
+                "content": {"type": "text"},
+                "filename": {"type": "keyword"},
+                "timestamp": {"type": "date"}
+            }
+        }
+    })
+    return {"message": "Index cleared"}
+
+
+@app.get("/api/eligibility")
+def get_eligibility():
+    response = query_eligibility_criteria()
+    # print(response)
+    return {"criteria": response}
+
+
+@app.get("/api/requirements")
+def get_requirements():
+    response = query_project_requirements()
+    # print(response)
+    return {"requirements": response}
+
+
+@app.get("/api/contract-risks")
+def get_contract_risks():
+    response = analyze_contract_risks()
+    # print(response)
+    return {"risks": response}
+
+@app.get("/api/submission-checklist")
+def get_submission_checklist():
+    checklist = generate_submission_checklist()
+    print(checklist)
+    print() 
+    return JSONResponse(content={"checklist": checklist})
